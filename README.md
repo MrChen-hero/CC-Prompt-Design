@@ -13,23 +13,6 @@
 - **跨平台支持**：提供 Web 端（Gemini Gems、ChatGPT GPTs）转换规则
 - **质量保证**：每个提示词均包含完整的示例和约束条件
 
-## 文件结构
-
-```
-Prompt/
-├── README.md           # 项目说明
-├── CLAUDE.md           # Claude Code 指导规则 & Anthropic 设计准则
-├── Prompt.md           # 主要提示词集合（15+ 个结构化提示词）
-├── Webrule.md          # Web 端提示词润色/转换规则
-└── Prompt_Source/      # 原始提示词资源
-    ├── Prompt.txt          # 基础角色提示词
-    ├── Experiment.txt      # 实验性提示词
-    ├── KimiPrompt.txt      # Kimi 格式提示词
-    ├── UniversalPrompt_1.md
-    ├── UniversalPrompt_2.md
-    └── UltimatePrompt.md
-```
-
 ## 提示词分类
 
 ### 科研学术类
