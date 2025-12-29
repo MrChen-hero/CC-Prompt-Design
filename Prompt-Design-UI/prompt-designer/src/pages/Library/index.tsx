@@ -3,8 +3,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { usePromptStore, useFilteredPrompts, type PromptCategory } from "@/store/promptStore"
+import { usePromptStore, useFilteredPrompts, type PromptCategory, type StoredPrompt } from "@/store/promptStore"
 import { promptsDB } from "@/services/db"
+import { PromptDetail } from "@/components/prompt/PromptDetail"
 import { useNavigate } from "react-router-dom"
 import {
   Search,
@@ -19,6 +20,7 @@ import {
   RefreshCw,
   Check,
   Loader2,
+  Eye,
 } from "lucide-react"
 
 const CATEGORIES: { value: PromptCategory | 'all'; label: string }[] = [
@@ -57,6 +59,10 @@ export function Library() {
   const [loading, setLoading] = useState(true)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // 详情弹窗状态
+  const [selectedPrompt, setSelectedPrompt] = useState<StoredPrompt | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   // 加载数据库中的提示词
   useEffect(() => {
@@ -113,6 +119,24 @@ export function Library() {
       toggleFavorite(id)
     } catch (error) {
       console.error('Failed to toggle favorite:', error)
+    }
+  }
+
+  // 打开详情弹窗
+  const handleOpenDetail = (prompt: StoredPrompt) => {
+    setSelectedPrompt(prompt)
+    setDetailOpen(true)
+  }
+
+  // 更新提示词（从详情弹窗触发）
+  const handleUpdatePrompt = (id: string, updates: Partial<StoredPrompt>) => {
+    // 更新 store 中的数据
+    const { updatePrompt } = usePromptStore.getState()
+    updatePrompt(id, updates)
+
+    // 同步更新 selectedPrompt 以保持弹窗数据最新
+    if (selectedPrompt && selectedPrompt.id === id) {
+      setSelectedPrompt({ ...selectedPrompt, ...updates })
     }
   }
 
@@ -223,14 +247,18 @@ export function Library() {
           {filteredPrompts.map((prompt) => (
             <Card
               key={prompt.id}
-              className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-colors"
+              className="bg-slate-800/50 border-slate-700 hover:border-purple-500/50 transition-colors cursor-pointer"
+              onClick={() => handleOpenDetail(prompt)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <button
-                        onClick={() => handleToggleFavorite(prompt.id, prompt.isFavorite)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleToggleFavorite(prompt.id, prompt.isFavorite)
+                        }}
                         className="hover:scale-110 transition-transform"
                       >
                         <Star
@@ -276,7 +304,16 @@ export function Library() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-slate-400 hover:text-white"
+                      onClick={() => handleOpenDetail(prompt)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      查看
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -310,7 +347,12 @@ export function Library() {
                         'Web版'
                       )}
                     </Button>
-                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-slate-400 hover:text-white"
+                      onClick={() => handleOpenDetail(prompt)}
+                    >
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
@@ -344,6 +386,16 @@ export function Library() {
           </Button>
         </div>
       </div>
+
+      {/* Prompt Detail Dialog */}
+      {selectedPrompt && (
+        <PromptDetail
+          prompt={selectedPrompt}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          onUpdate={handleUpdatePrompt}
+        />
+      )}
     </div>
   )
 }

@@ -20,6 +20,10 @@ export interface GenerateSession {
     language: 'zh' | 'en'
     outputStyle: 'professional' | 'friendly' | 'academic'
     includeExample: boolean
+    // AI 生成的原始标签内容（用于对比用户是否修改）
+    generatedTagContent: Partial<Record<XmlTag, string>>
+    // 用户自定义的标签内容（编辑后的内容）
+    customTagContent: Partial<Record<XmlTag, string>>
   }
 
   // Step 4: 生成结果
@@ -61,6 +65,8 @@ export const DEFAULT_ADJUSTMENTS: GenerateSession['adjustments'] = {
   language: 'zh',
   outputStyle: 'professional',
   includeExample: false,
+  generatedTagContent: {},
+  customTagContent: {},
 }
 
 export function createNewSession(): GenerateSession {

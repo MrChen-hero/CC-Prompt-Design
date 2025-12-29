@@ -24,6 +24,11 @@ interface GenerateStore {
   setLanguage: (language: 'zh' | 'en') => void
   setOutputStyle: (style: 'professional' | 'friendly' | 'academic') => void
   setIncludeExample: (include: boolean) => void
+  setCustomTagContent: (tag: XmlTag, content: string) => void
+  clearCustomTagContent: (tag: XmlTag) => void
+  // AI 生成内容相关
+  setGeneratedTagContent: (content: Partial<Record<XmlTag, string>>) => void
+  updateGeneratedTag: (tag: XmlTag, content: string) => void
 
   // Step 4: Result
   setResult: (result: GenerateSession['result']) => void
@@ -115,6 +120,65 @@ export const useGenerateStore = create<GenerateStore>((set) => ({
       session: {
         ...state.session,
         adjustments: { ...state.session.adjustments, includeExample },
+      },
+    })),
+
+  setCustomTagContent: (tag, content) =>
+    set((state) => ({
+      session: {
+        ...state.session,
+        adjustments: {
+          ...state.session.adjustments,
+          customTagContent: {
+            ...state.session.adjustments.customTagContent,
+            [tag]: content,
+          },
+        },
+      },
+    })),
+
+  clearCustomTagContent: (tag) =>
+    set((state) => {
+      const { [tag]: _, ...rest } = state.session.adjustments.customTagContent
+      return {
+        session: {
+          ...state.session,
+          adjustments: {
+            ...state.session.adjustments,
+            customTagContent: rest,
+          },
+        },
+      }
+    }),
+
+  setGeneratedTagContent: (content) =>
+    set((state) => ({
+      session: {
+        ...state.session,
+        adjustments: {
+          ...state.session.adjustments,
+          generatedTagContent: content,
+          // 同时初始化 customTagContent 为相同内容
+          customTagContent: { ...content },
+        },
+      },
+    })),
+
+  updateGeneratedTag: (tag, content) =>
+    set((state) => ({
+      session: {
+        ...state.session,
+        adjustments: {
+          ...state.session.adjustments,
+          generatedTagContent: {
+            ...state.session.adjustments.generatedTagContent,
+            [tag]: content,
+          },
+          customTagContent: {
+            ...state.session.adjustments.customTagContent,
+            [tag]: content,
+          },
+        },
       },
     })),
 

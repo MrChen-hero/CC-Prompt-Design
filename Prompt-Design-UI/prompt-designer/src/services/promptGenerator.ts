@@ -1,14 +1,16 @@
-import { type GenerateSession } from '@/types/generate'
+import { type GenerateSession, type XmlTag } from '@/types/generate'
 
 /**
  * 生成 CLI 专业版提示词 (Anthropic XML 格式)
+ *
+ * 优先使用 customTagContent 中的用户自定义内容
  */
 export function generateCliPrompt(
   description: string,
   analysis: NonNullable<GenerateSession['analysis']>,
   adjustments: GenerateSession['adjustments']
 ): string {
-  const { enabledTags, language, outputStyle } = adjustments
+  const { enabledTags, language, outputStyle, customTagContent } = adjustments
   const { roleIdentification, taskGoals } = analysis
 
   const sections: string[] = []
@@ -20,87 +22,111 @@ export function generateCliPrompt(
     academic: { tone: '学术、规范', manner: '引经据典，论证严密' },
   }
   const style = styleMap[outputStyle]
+  const langConstraint = language === 'zh' ? '使用简体中文回复' : 'Reply in English'
+
+  // 辅助函数：获取标签内容（优先使用自定义内容）
+  const getTagContent = (tag: XmlTag, defaultContent: string): string => {
+    if (customTagContent[tag] !== undefined && customTagContent[tag].trim() !== '') {
+      return customTagContent[tag]
+    }
+    return defaultContent
+  }
 
   // <role>
   if (enabledTags.includes('role')) {
-    sections.push(`<role>
-你是一位${roleIdentification}，具备深厚的专业背景和丰富的实战经验。
-你以${style.tone}的风格进行沟通，${style.manner}。
-</role>`)
+    const defaultRole = `你是一位${roleIdentification}，具备深厚的专业背景和丰富的实战经验。
+你以${style.tone}的风格进行沟通，${style.manner}。`
+    sections.push(`<role>\n${getTagContent('role', defaultRole)}\n</role>`)
   }
 
   // <task>
   if (enabledTags.includes('task')) {
     const taskList = taskGoals.map(g => `- ${g}`).join('\n')
-    sections.push(`<task>
-你的任务是帮助用户完成以下目标：
+    const defaultTask = `你的任务是帮助用户完成以下目标：
 ${taskList}
 
-核心需求描述：${description}
-</task>`)
+核心需求描述：${description}`
+    sections.push(`<task>\n${getTagContent('task', defaultTask)}\n</task>`)
   }
 
   // <thinking>
   if (enabledTags.includes('thinking')) {
-    sections.push(`<thinking>
-此思考过程为内部推理，不直接输出给用户。
+    const defaultThinking = `此思考过程为内部推理，不直接输出给用户。
 
 在回答之前，请按以下框架思考：
 1. **需求理解**：准确理解用户的核心诉求
 2. **方案设计**：基于专业知识设计解决方案
 3. **验证检查**：确保方案的可行性和正确性
-4. **输出组织**：以清晰的结构呈现结果
-</thinking>`)
+4. **输出组织**：以清晰的结构呈现结果`
+    sections.push(`<thinking>\n${getTagContent('thinking', defaultThinking)}\n</thinking>`)
   }
 
   // <instructions>
   if (enabledTags.includes('instructions')) {
-    sections.push(`<instructions>
-1. 仔细阅读并理解用户的输入内容
+    const defaultInstructions = `1. 仔细阅读并理解用户的输入内容
 2. 运用专业知识进行分析和处理
 3. 以结构化的方式组织输出内容
 4. 如有不确定之处，明确说明并提供多种可能的解决方案
 5. 根据问题类型选择合适的输出格式：
    - 分析类问题：使用"分析过程" + "结论"结构
    - 操作类问题：使用分步骤说明
-   - 创意类问题：提供多个备选方案
-</instructions>`)
+   - 创意类问题：提供多个备选方案`
+    sections.push(`<instructions>\n${getTagContent('instructions', defaultInstructions)}\n</instructions>`)
   }
 
   // <output_format>
   if (enabledTags.includes('output_format')) {
-    sections.push(`<output_format>
-- 使用 Markdown 格式进行排版
+    const defaultOutputFormat = `- 使用 Markdown 格式进行排版
 - 重要信息使用**加粗**标注
 - 代码使用 \`代码块\` 包裹
 - 对比信息使用表格呈现
-- 步骤说明使用有序列表
-</output_format>`)
+- 步骤说明使用有序列表`
+    sections.push(`<output_format>\n${getTagContent('output_format', defaultOutputFormat)}\n</output_format>`)
   }
 
   // <constraints>
   if (enabledTags.includes('constraints')) {
-    const langConstraint = language === 'zh' ? '使用简体中文回复' : 'Reply in English'
-    sections.push(`<constraints>
-- ${langConstraint}
+    const defaultConstraints = `- ${langConstraint}
 - 保持${style.tone}的沟通风格
 - 回答必须基于事实，如不确定请明确说明
 - 避免冗余内容，保持简洁有效
-- 遵循职业道德，不提供有害建议
-</constraints>`)
+- 遵循职业道德，不提供有害建议`
+    sections.push(`<constraints>\n${getTagContent('constraints', defaultConstraints)}\n</constraints>`)
   }
 
   // <example>
   if (enabledTags.includes('example')) {
-    sections.push(`<example>
-<user>
+    const defaultExample = `<user>
 [用户输入示例]
 </user>
 
 <assistant>
 [助手回复示例]
-</assistant>
-</example>`)
+</assistant>`
+    sections.push(`<example>\n${getTagContent('example', defaultExample)}\n</example>`)
+  }
+
+  // <tools>
+  if (enabledTags.includes('tools')) {
+    const defaultTools = `可用工具：
+- 搜索工具：用于查询最新信息
+- 计算工具：用于数学计算
+- 代码执行：用于运行代码片段
+
+使用规则：
+1. 根据任务需求选择合适的工具
+2. 优先使用内置能力，必要时才调用工具
+3. 明确说明工具调用的目的和预期结果`
+    sections.push(`<tools>\n${getTagContent('tools', defaultTools)}\n</tools>`)
+  }
+
+  // <context>
+  if (enabledTags.includes('context')) {
+    const defaultContext = `背景信息：
+[在此提供与任务相关的背景知识、参考资料或上下文信息]
+
+相关文档或数据将在此处提供，请基于这些信息进行回答。`
+    sections.push(`<context>\n${getTagContent('context', defaultContext)}\n</context>`)
   }
 
   return sections.join('\n\n')
@@ -181,6 +207,13 @@ export function generateWebPrompt(cliPrompt: string): string {
     sections.push(`语言与态度：\n使用${lang}回复，保持${style}的沟通风格。`)
   }
 
+  // 提取 <context> 内容
+  const contextMatch = cliPrompt.match(/<context>([\s\S]*?)<\/context>/)
+  if (contextMatch) {
+    const contextContent = contextMatch[1].trim()
+    sections.push(`背景信息：\n${contextContent}`)
+  }
+
   return sections.join('\n\n')
 }
 
@@ -219,9 +252,15 @@ export function webToCliPrompt(webPrompt: string): string {
   }
 
   // 尝试提取约束
-  const constraintsMatch = webPrompt.match(/语言与态度[：:]([\s\S]*?)$/)
+  const constraintsMatch = webPrompt.match(/语言与态度[：:]([\s\S]*?)(?=\n\n|背景信息|$)/)
   if (constraintsMatch) {
     sections.push(`<constraints>\n${constraintsMatch[1].trim()}\n</constraints>`)
+  }
+
+  // 尝试提取背景信息
+  const contextMatch = webPrompt.match(/背景信息[：:]([\s\S]*?)$/)
+  if (contextMatch) {
+    sections.push(`<context>\n${contextMatch[1].trim()}\n</context>`)
   }
 
   return sections.join('\n\n')
