@@ -16,17 +16,43 @@
 | **提示词存储** | 保存用户生成的提示词，支持随取随用 |
 | **一键格式切换** | CLI ↔ Web 格式互转，双版本并存 |
 
-### 1.2 技术栈建议
+### 1.2 技术栈（已确认）
 
-| 层级 | 技术选型 | 备选方案 |
-|------|----------|----------|
-| **前端框架** | React + TypeScript | Vue 3 + TypeScript |
-| **UI 组件库** | Tailwind CSS + shadcn/ui | Ant Design / Material UI |
-| **状态管理** | Zustand | Redux Toolkit / Jotai |
-| **后端框架** | Node.js + Express | Python + FastAPI |
-| **数据库** | SQLite (本地) / PostgreSQL (云端) | MongoDB |
-| **API 通信** | RESTful API + WebSocket (流式输出) | tRPC |
-| **部署** | Vercel / Docker | Cloudflare Workers |
+| 层级 | 技术选型 | 说明 |
+|------|----------|------|
+| **前端框架** | React 18 + TypeScript | 并发特性支持流式渲染 |
+| **构建工具** | Vite 5 | 快速 HMR，原生 ESM |
+| **UI 组件库** | Tailwind CSS + shadcn/ui | 可定制、无运行时依赖 |
+| **状态管理** | Zustand | 轻量级、TS 友好 |
+| **AI SDK** | Vercel AI SDK | 流式输出、多模型支持 |
+| **本地存储** | Dexie.js (IndexedDB) | 结构化本地数据库 |
+| **路由** | React Router v6 | 声明式路由 |
+| **部署** | Vercel | 零配置部署、边缘函数 |
+
+### 1.3 技术选型理由
+
+#### 为什么选择 React + shadcn/ui？
+
+| 决策因素 | 说明 |
+|----------|------|
+| **shadcn/ui 绑定** | 该组件库仅支持 React（基于 Radix UI） |
+| **流式输出** | React 18 并发特性 + Suspense 天然支持 AI 流式响应 |
+| **Vercel 生态** | Vercel AI SDK 与 React 深度集成 |
+| **社区资源** | AI/LLM 相关的 React 组件库最丰富 |
+
+#### 为什么选择 Vercel AI SDK？
+
+```typescript
+// 一行代码实现流式输出
+const { messages, input, handleSubmit } = useChat({
+  api: '/api/chat',
+  onFinish: (message) => saveToLibrary(message)
+});
+```
+
+- 内置 `useChat`、`useCompletion` hooks
+- 自动处理流式响应解析
+- 支持 Anthropic、OpenAI、Google 等多模型
 
 ---
 
@@ -809,40 +835,485 @@ function validatePrompt(prompt: string): ValidationResult {
 
 ---
 
-## 七、开发计划
+## 七、完整开发计划
 
-### Phase 1: 核心功能（MVP）
+> 从项目创建 → 功能实现 → 部署上线的完整流程
 
-| 任务 | 优先级 | 依赖 |
-|------|--------|------|
-| 项目初始化（React + TypeScript + Tailwind） | P0 | - |
-| UI 组件库搭建（shadcn/ui） | P0 | 项目初始化 |
-| 模型 API 配置界面 | P0 | UI 组件库 |
-| OpenAI/Anthropic API 集成 | P0 | 模型配置界面 |
-| CLI 提示词生成流程（4 步向导） | P0 | API 集成 |
-| 提示词仓库（本地存储） | P0 | CLI 生成 |
-| 基础格式转换 | P1 | CLI 生成 |
+---
 
-### Phase 2: 完善功能
+### 7.1 Phase 0: 项目初始化
 
-| 任务 | 优先级 | 依赖 |
-|------|--------|------|
-| Web 端提示词生成流程 | P1 | CLI 生成 |
-| 一键格式切换 | P1 | 格式转换 |
-| 提示词导入/导出 | P1 | 仓库 |
-| 流式输出优化 | P1 | API 集成 |
-| 深色模式 | P2 | UI 组件库 |
-| 更多模型支持（Gemini, DeepSeek） | P2 | API 集成 |
+#### Step 1: 创建 Vite + React + TypeScript 项目
 
-### Phase 3: 高级功能
+```bash
+# 创建项目
+npm create vite@latest prompt-designer -- --template react-ts
 
-| 任务 | 优先级 | 依赖 |
-|------|--------|------|
-| 用户账户系统 | P2 | - |
-| 云端同步 | P2 | 账户系统 |
-| 提示词分享/社区 | P3 | 云端同步 |
-| 提示词版本历史 | P3 | 云端同步 |
-| 提示词效果测试 | P3 | API 集成 |
+# 进入项目目录
+cd prompt-designer
+
+# 安装依赖
+npm install
+```
+
+#### Step 2: 配置 Tailwind CSS
+
+```bash
+# 安装 Tailwind CSS
+npm install -D tailwindcss postcss autoprefixer
+
+# 初始化配置文件
+npx tailwindcss init -p
+```
+
+**tailwind.config.js**:
+```javascript
+/** @type {import('tailwindcss').Config} */
+export default {
+  darkMode: ["class"],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        // ... shadcn/ui 颜色变量
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+}
+```
+
+#### Step 3: 配置 shadcn/ui
+
+```bash
+# 初始化 shadcn/ui
+npx shadcn@latest init
+
+# 选择配置：
+# - Style: Default
+# - Base color: Slate (深色主题友好)
+# - CSS variables: Yes
+
+# 安装常用组件
+npx shadcn@latest add button card input select tabs dialog sheet
+npx shadcn@latest add dropdown-menu checkbox slider textarea badge
+npx shadcn@latest add tooltip progress separator avatar
+```
+
+#### Step 4: 安装核心依赖
+
+```bash
+# 状态管理
+npm install zustand
+
+# AI SDK (流式输出)
+npm install ai @ai-sdk/anthropic @ai-sdk/openai
+
+# 路由
+npm install react-router-dom
+
+# 本地数据库
+npm install dexie dexie-react-hooks
+
+# 工具库
+npm install clsx tailwind-merge lucide-react
+npm install @radix-ui/react-icons
+
+# 代码高亮 (提示词预览)
+npm install prism-react-renderer
+
+# 开发依赖
+npm install -D @types/node
+```
+
+#### Step 5: 项目结构初始化
+
+```bash
+# 创建目录结构
+mkdir -p src/{components/{ui,layout,prompt,model,wizard},pages/{Create,Library},hooks,services/{api},store,types,utils,constants,lib}
+```
+
+**完成标志**：`npm run dev` 可正常启动，显示空白深色页面
+
+---
+
+### 7.2 Phase 1: 基础架构搭建
+
+| 任务 | 对应 UI | 产出文件 | 验收标准 |
+|------|---------|----------|----------|
+| 布局组件 | Dashboard 侧边栏 | `Layout.tsx`, `Sidebar.tsx` | 侧边栏导航可点击 |
+| 路由配置 | - | `App.tsx` | 页面跳转正常 |
+| 主题系统 | 深色主题 | `globals.css` | 深色模式生效 |
+| 状态管理 | - | `store/*.ts` | Zustand store 可用 |
+| 本地数据库 | - | `services/db.ts` | IndexedDB 初始化成功 |
+
+#### 核心文件实现
+
+**src/lib/utils.ts** (shadcn/ui 工具函数):
+```typescript
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+```
+
+**src/store/modelStore.ts**:
+```typescript
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+interface ModelConfig {
+  id: string
+  provider: 'anthropic' | 'openai' | 'google' | 'deepseek' | 'custom'
+  apiKey: string
+  modelId: string
+  baseUrl?: string
+  temperature: number
+  maxTokens: number
+  isDefault: boolean
+}
+
+interface ModelStore {
+  models: ModelConfig[]
+  activeModel: ModelConfig | null
+  setActiveModel: (model: ModelConfig) => void
+  addModel: (model: ModelConfig) => void
+  updateModel: (id: string, updates: Partial<ModelConfig>) => void
+  removeModel: (id: string) => void
+}
+
+export const useModelStore = create<ModelStore>()(
+  persist(
+    (set) => ({
+      models: [],
+      activeModel: null,
+      setActiveModel: (model) => set({ activeModel: model }),
+      addModel: (model) => set((state) => ({
+        models: [...state.models, model]
+      })),
+      updateModel: (id, updates) => set((state) => ({
+        models: state.models.map(m => m.id === id ? { ...m, ...updates } : m)
+      })),
+      removeModel: (id) => set((state) => ({
+        models: state.models.filter(m => m.id !== id)
+      })),
+    }),
+    { name: 'model-storage' }
+  )
+)
+```
+
+**src/services/db.ts** (Dexie 数据库):
+```typescript
+import Dexie, { type Table } from 'dexie'
+
+export interface StoredPrompt {
+  id?: number
+  name: string
+  description: string
+  category: string
+  tags: string[]
+  cliVersion: string
+  webVersion: string
+  createdAt: Date
+  updatedAt: Date
+  usageCount: number
+  isFavorite: boolean
+}
+
+export class PromptDesignerDB extends Dexie {
+  prompts!: Table<StoredPrompt>
+
+  constructor() {
+    super('PromptDesigner')
+    this.version(1).stores({
+      prompts: '++id, name, category, *tags, createdAt, isFavorite'
+    })
+  }
+}
+
+export const db = new PromptDesignerDB()
+```
+
+---
+
+### 7.3 Phase 2: 核心页面实现
+
+#### 对应 UI 截图映射
+
+| UI 截图 | 页面/组件 | 优先级 |
+|---------|-----------|--------|
+| Dashboard (8101DDB7) | `pages/Home.tsx` | P0 |
+| 模型配置 (044E66DB) | `components/model/ModelConfig.tsx` | P0 |
+| Step 1 输入 (46F17091) | `pages/Create/Step1Input.tsx` | P0 |
+| Step 2 AI分析 (19207438) | `pages/Create/Step2Analysis.tsx` | P0 |
+| Step 3 调整 (28FD860C) | `pages/Create/Step3Adjust.tsx` | P1 |
+| Step 4 结果 (8725583F) | `pages/Create/Step4Result.tsx` | P0 |
+| 提示词仓库 (0C863C78) | `pages/Library/index.tsx` | P0 |
+| 提示词详情 (CB1F8444) | `pages/Library/PromptDetail.tsx` | P1 |
+
+#### 实现顺序
+
+```
+Week 1-2: 基础框架
+├── Layout + Sidebar + Header
+├── Home Dashboard
+└── 路由配置
+
+Week 3-4: 模型与 AI 集成
+├── ModelConfig 组件
+├── API Key 加密存储
+├── Vercel AI SDK 集成
+└── 流式输出测试
+
+Week 5-6: 生成向导
+├── Step 1: 输入描述
+├── Step 2: AI 分析 (流式)
+├── Step 3: 方案调整
+└── Step 4: 结果展示
+
+Week 7-8: 仓库与转换
+├── 提示词列表
+├── 提示词详情/编辑
+├── CLI ↔ Web 转换
+└── 导入/导出功能
+```
+
+#### 关键组件实现
+
+**src/pages/Create/Step2Analysis.tsx** (流式 AI 分析):
+```typescript
+'use client'
+import { useCompletion } from 'ai/react'
+import { useState } from 'react'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+
+interface AnalysisResult {
+  roleIdentification: string
+  taskGoals: string[]
+  recommendedTemplate: string
+  suggestedTags: string[]
+}
+
+export function Step2Analysis({ userDescription }: { userDescription: string }) {
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
+
+  const { complete, completion, isLoading } = useCompletion({
+    api: '/api/analyze',
+    onFinish: (result) => {
+      // 解析 AI 返回的结构化结果
+      setAnalysis(parseAnalysisResult(result))
+    }
+  })
+
+  return (
+    <Card className="p-6 bg-slate-900 border-slate-700">
+      <h2 className="text-xl font-bold text-white mb-4">
+        Step 2: AI 分析与方案生成
+      </h2>
+
+      <div className="space-y-4">
+        {/* AI 分析结果 - 流式显示 */}
+        <div className="p-4 bg-slate-800 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-purple-400">🤖 AI 分析结果：</span>
+            {isLoading && <span className="animate-pulse">●●●</span>}
+          </div>
+
+          {analysis && (
+            <>
+              {/* 角色定位 */}
+              <div className="flex items-center gap-2 p-3 bg-slate-700/50 rounded mb-2">
+                <span>📋 角色定位：{analysis.roleIdentification}</span>
+                <Badge variant="secondary">科研助手</Badge>
+                <Badge variant="secondary">代码专家</Badge>
+              </div>
+
+              {/* 推荐模板 */}
+              <div className="flex items-center gap-2 p-3 bg-slate-700/50 rounded mb-2">
+                <span>🛠️ 推荐模板：</span>
+                <Badge className="bg-purple-600">模板 C (代码/技术任务型)</Badge>
+                <Badge className="bg-purple-600">模板 E (深度推理)</Badge>
+              </div>
+
+              {/* 建议 XML 标签 */}
+              <div className="p-3 bg-slate-700/50 rounded">
+                <span className="text-red-400">📌 建议包含的 XML 标签：</span>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {analysis.suggestedTags.map(tag => (
+                    <Badge key={tag} variant="outline">{`<${tag}>`}</Badge>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 操作按钮 */}
+        <div className="flex gap-3">
+          <Button variant="outline">← 返回修改</Button>
+          <Button className="bg-purple-600 hover:bg-purple-700 flex-1">
+            接受并继续 →
+          </Button>
+          <Button variant="outline">自定义调整 ⚙️</Button>
+        </div>
+      </div>
+    </Card>
+  )
+}
+```
+
+---
+
+### 7.4 Phase 3: API 路由实现
+
+#### Vercel Edge Functions 结构
+
+```
+api/
+├── analyze.ts      # AI 分析用户描述
+├── generate.ts     # 生成提示词
+├── convert.ts      # 格式转换
+└── test-connection.ts  # 测试 API 连接
+```
+
+**api/generate.ts** (流式生成):
+```typescript
+import { anthropic } from '@ai-sdk/anthropic'
+import { streamText } from 'ai'
+
+export const runtime = 'edge'
+
+export async function POST(req: Request) {
+  const { userDescription, options } = await req.json()
+
+  const result = await streamText({
+    model: anthropic('claude-3-5-sonnet-20241022'),
+    system: PROMPT_DESIGNER_SYSTEM_PROMPT, // 内部 System Prompt
+    messages: [
+      {
+        role: 'user',
+        content: `请根据以下描述生成提示词：\n\n${userDescription}`
+      }
+    ],
+    temperature: 0.7,
+    maxTokens: 4096,
+  })
+
+  return result.toDataStreamResponse()
+}
+```
+
+---
+
+### 7.5 Phase 4: 部署流程
+
+#### Step 1: 准备部署
+
+```bash
+# 确保构建成功
+npm run build
+
+# 本地预览生产版本
+npm run preview
+```
+
+#### Step 2: Vercel 部署配置
+
+**vercel.json**:
+```json
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "env": {
+    "ANTHROPIC_API_KEY": "@anthropic-api-key",
+    "OPENAI_API_KEY": "@openai-api-key"
+  }
+}
+```
+
+#### Step 3: 部署到 Vercel
+
+```bash
+# 安装 Vercel CLI
+npm i -g vercel
+
+# 登录
+vercel login
+
+# 部署（首次会创建项目）
+vercel
+
+# 生产部署
+vercel --prod
+```
+
+#### Step 4: 环境变量配置
+
+在 Vercel Dashboard 中设置：
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `ANTHROPIC_API_KEY` | Anthropic API 密钥 | `sk-ant-...` |
+| `OPENAI_API_KEY` | OpenAI API 密钥 (可选) | `sk-...` |
+
+#### Step 5: 自定义域名（可选）
+
+```bash
+# 添加域名
+vercel domains add prompt-designer.yourdomain.com
+```
+
+---
+
+### 7.6 开发里程碑
+
+| 阶段 | 目标 | 验收标准 | 状态 |
+|------|------|----------|------|
+| **M0** | 项目初始化 | `npm run dev` 可运行 | ✅ 已完成 |
+| **M1** | 基础架构 | 侧边栏导航、深色主题 | ✅ 已完成 |
+| **M2** | 模型配置 | API Key 保存、连接测试 | ⬜ 待完成 |
+| **M3** | 生成向导 | 4 步流程完整、流式输出 | ✅ 已完成 (模拟) |
+| **M4** | 仓库功能 | CRUD、搜索、分类 | ✅ 已完成 |
+| **M5** | 格式转换 | CLI ↔ Web 互转 | ✅ 已完成 |
+| **M6** | 部署上线 | Vercel 生产环境可访问 | ⬜ 待完成 |
+
+---
+
+### 7.7 开发命令速查
+
+```bash
+# 开发
+npm run dev              # 启动开发服务器
+npm run build            # 构建生产版本
+npm run preview          # 预览生产版本
+
+# shadcn/ui 组件
+npx shadcn@latest add [component]  # 添加组件
+
+# 部署
+vercel                   # 预览部署
+vercel --prod            # 生产部署
+vercel env pull          # 拉取环境变量
+
+# 数据库 (开发调试)
+# 打开 Chrome DevTools → Application → IndexedDB → PromptDesigner
+```
 
 ---
 
@@ -928,17 +1399,87 @@ prompt-designer/
 
 - [Anthropic API](https://docs.anthropic.com/claude/reference)
 - [OpenAI API](https://platform.openai.com/docs/api-reference)
+- [Vercel AI SDK](https://sdk.vercel.ai/docs) - 流式输出核心
 - [shadcn/ui](https://ui.shadcn.com/)
 - [Tailwind CSS](https://tailwindcss.com/docs)
 - [Zustand](https://github.com/pmndrs/zustand)
 - [Dexie.js](https://dexie.org/)
+- [React Router](https://reactrouter.com/)
+- [Vite](https://vitejs.dev/)
 
 ---
 
 ## 十、下一步行动
 
-1. [ ] 确认技术栈选择（React vs Vue）
-2. [ ] 确认部署方式（纯前端 vs 前后端分离）
-3. [ ] 确认是否需要用户账户系统
-4. [ ] 初始化项目结构
-5. [ ] 开始 Phase 1 开发
+### 已完成决策
+
+- [x] 确认技术栈选择 → **React + TypeScript + shadcn/ui**
+- [x] 确认部署方式 → **Vercel（纯前端 + Edge Functions）**
+- [x] 确认是否需要用户账户系统 → **MVP 阶段不需要，使用本地存储**
+- [x] UI 设计方案 → **已完成 8 个核心页面设计**
+
+### 立即执行（Phase 0）
+
+```bash
+# 1. 创建项目
+npm create vite@latest prompt-designer -- --template react-ts
+cd prompt-designer
+
+# 2. 安装依赖
+npm install
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+
+# 3. 初始化 shadcn/ui
+npx shadcn@latest init
+
+# 4. 安装核心依赖
+npm install zustand ai @ai-sdk/anthropic react-router-dom dexie
+npm install clsx tailwind-merge lucide-react prism-react-renderer
+```
+
+### 开发优先级
+
+| 优先级 | 任务 | 预计产出 |
+|--------|------|----------|
+| **P0** | 项目初始化 + 基础架构 | 可运行的空项目框架 |
+| **P0** | 模型配置组件 | API Key 保存、连接测试 |
+| **P0** | 4 步生成向导 | 完整生成流程（流式） |
+| **P0** | 提示词仓库 | CRUD + 本地存储 |
+| **P1** | CLI ↔ Web 转换 | 格式互转功能 |
+| **P1** | 导入/导出 | JSON/Markdown 导出 |
+| **P2** | 更多模型支持 | OpenAI、Gemini、DeepSeek |
+| **P3** | 用户账户 + 云同步 | 多设备同步 |
+
+### 里程碑检查点
+
+```
+M0 完成标志：npm run dev 可正常启动          ✅ 已完成
+M1 完成标志：侧边栏导航 + 深色主题生效        ✅ 已完成
+M2 完成标志：可保存 API Key 并测试连接        ⬜ 待完成
+M3 完成标志：可完成 4 步向导生成提示词        ✅ 已完成 (模拟AI)
+M4 完成标志：提示词可保存/编辑/删除          ✅ 已完成
+M5 完成标志：CLI ↔ Web 格式可互转            ✅ 已完成
+M6 完成标志：vercel --prod 部署成功          ⬜ 待完成
+```
+
+### 当前进度总结
+
+**已完成功能：**
+- ✅ 项目基础架构 (Vite + React + TypeScript + Tailwind CSS v3 + shadcn/ui)
+- ✅ 响应式布局 (侧边栏 + 顶栏 + 主内容区)
+- ✅ 深色主题样式
+- ✅ 路由配置 (首页/创建/仓库/转换/设置)
+- ✅ Zustand 状态管理 (modelStore, promptStore, generateStore)
+- ✅ Dexie IndexedDB 本地数据库
+- ✅ 4 步生成向导 (Step1Input → Step2Analysis → Step3Adjust → Step4Result)
+- ✅ CLI ↔ Web 格式转换逻辑
+- ✅ 提示词仓库 CRUD 功能
+- ✅ 搜索/筛选/排序功能
+- ✅ 复制/下载/导出功能
+
+**待完成功能：**
+- ⬜ 真实 AI API 集成 (当前为模拟分析)
+- ⬜ API Key 加密存储与验证
+- ⬜ Vercel 部署配置
+- ⬜ 更多模型支持 (OpenAI, Gemini, DeepSeek)
