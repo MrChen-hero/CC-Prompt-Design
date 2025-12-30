@@ -3,75 +3,9 @@ import { Button } from "@/components/ui/button"
 import { useGenerateStore } from "@/store/generateStore"
 import { type XmlTag, XML_TAG_INFO } from "@/types/generate"
 import { XML_TAG_TEMPLATES, OUTPUT_STYLES, LANGUAGES } from "@/constants/promptRules"
-import { Check, ChevronDown, ChevronUp, Plus, RotateCcw, Sparkles, Loader2 } from "lucide-react"
+import { Check, ChevronDown, ChevronUp, Plus, RotateCcw, Sparkles, Loader2, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-// 模拟 AI 润色功能（后续替换为真实 API 调用）
-function polishTagContent(
-  tag: XmlTag,
-  currentContent: string,
-  context: {
-    roleIdentification: string
-    taskGoals: string[]
-    language: 'zh' | 'en'
-    outputStyle: 'professional' | 'friendly' | 'academic'
-  }
-): Promise<string> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const style = OUTPUT_STYLES[context.outputStyle]
-
-      // 模拟 AI 润色：在原内容基础上优化
-      let polished = currentContent
-
-      // 根据标签类型进行不同的润色处理
-      switch (tag) {
-        case 'role':
-          // 确保角色定义包含专业背景和风格
-          if (!currentContent.includes(style.tone)) {
-            polished = `${currentContent}\n\n你以${style.tone}的风格进行沟通，${style.manner}。`
-          }
-          break
-
-        case 'task':
-          // 确保任务声明清晰
-          if (!currentContent.startsWith('你的任务是')) {
-            polished = `你的任务是：\n${currentContent}`
-          }
-          break
-
-        case 'thinking':
-          // 确保思考框架包含内部推理说明
-          if (!currentContent.includes('内部推理')) {
-            polished = `此思考过程为内部推理，不直接输出给用户。\n\n${currentContent}`
-          }
-          break
-
-        case 'instructions':
-          // 确保操作指令有编号
-          if (!currentContent.match(/^\d+\./m)) {
-            const lines = currentContent.split('\n').filter(l => l.trim())
-            polished = lines.map((line, i) => `${i + 1}. ${line.replace(/^[-•]\s*/, '')}`).join('\n')
-          }
-          break
-
-        case 'constraints':
-          // 确保约束条件使用列表格式
-          if (!currentContent.includes('-')) {
-            const lines = currentContent.split('\n').filter(l => l.trim())
-            polished = lines.map(line => `- ${line.replace(/^[-•]\s*/, '')}`).join('\n')
-          }
-          break
-
-        default:
-          // 其他标签保持原样，添加润色标记
-          polished = currentContent.trim()
-      }
-
-      resolve(polished)
-    }, 800) // 模拟延迟
-  })
-}
+import { polishTagContent as aiPolishTagContent, canUseAI } from "@/services/ai"
 
 export function Step3Adjust() {
   const {
@@ -86,13 +20,15 @@ export function Step3Adjust() {
     prevStep,
   } = useGenerateStore()
 
-  const { adjustments, analysis } = session
+  const { adjustments, analysis, userDescription } = session
   const { enabledTags, language, outputStyle, generatedTagContent, customTagContent } = adjustments
 
   // 跟踪哪些标签被展开
   const [expandedTags, setExpandedTags] = useState<Set<XmlTag>>(new Set())
   // 跟踪正在重新生成的标签
   const [regeneratingTags, setRegeneratingTags] = useState<Set<XmlTag>>(new Set())
+  // 错误信息
+  const [error, setError] = useState<string | null>(null)
 
   const allTags: XmlTag[] = [
     'role',
@@ -163,21 +99,32 @@ export function Step3Adjust() {
   const handleRegenerate = async (tag: XmlTag) => {
     if (!analysis) return
 
+    // 检查 AI 是否可用
+    const aiStatus = await canUseAI()
+    if (!aiStatus.available) {
+      setError(aiStatus.message || '请先在设置页面配置 AI API')
+      return
+    }
+
     setRegeneratingTags((prev) => new Set(prev).add(tag))
+    setError(null)
 
     try {
       const currentContent = getTagContent(tag)
-      const polished = await polishTagContent(tag, currentContent, {
-        roleIdentification: analysis.roleIdentification,
-        taskGoals: analysis.taskGoals,
+      const polished = await aiPolishTagContent(
+        tag,
+        currentContent,
+        userDescription,
+        analysis,
         language,
-        outputStyle,
-      })
+        outputStyle
+      )
 
       // 更新生成内容和自定义内容
       updateGeneratedTag(tag, polished)
-    } catch (error) {
-      console.error('Failed to regenerate tag content:', error)
+    } catch (err) {
+      console.error('Failed to regenerate tag content:', err)
+      setError(err instanceof Error ? err.message : '润色失败，请重试')
     } finally {
       setRegeneratingTags((prev) => {
         const next = new Set(prev)
@@ -432,6 +379,20 @@ export function Step3Adjust() {
           ✓ AI生成 | ✎ 已修改（将使用您的自定义内容）
         </p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-400">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+          <button
+            className="ml-auto text-red-300 hover:text-red-200 text-sm"
+            onClick={() => setError(null)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">

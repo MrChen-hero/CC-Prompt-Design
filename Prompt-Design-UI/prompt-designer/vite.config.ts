@@ -10,4 +10,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      // 代理 Anthropic API 请求
+      '/api/anthropic': {
+        target: 'https://api.anthropic.com/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
+        headers: {
+          'anthropic-version': '2023-06-01',
+        },
+      },
+    },
+  },
 })
