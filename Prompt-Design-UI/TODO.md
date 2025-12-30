@@ -1493,7 +1493,135 @@ M6 完成标志：vercel --prod 部署成功          ⬜ 待完成
 - ✅ **自定义 OpenAI 兼容接口支持** (支持 Ollama, LM Studio, vLLM 等)
 - ✅ **Settings 页面完整重写** (支持所有提供商配置，连接测试，自定义模型)
 - ✅ **Vite 代理配置** (解决开发环境 CORS 跨域问题)
+- ✅ **Step2 三阶段生成流程** (提示词设计 → 质量检查 → 自动润色)
+- ✅ **AI 质量检查** (基于 CLAUDE.md 准则自动检查提示词质量)
+- ✅ **分析结果优化** (roleIdentification + roleDescription 分离)
+- ✅ **Step4 返回刷新修复** (返回 Step3 修改后重新生成)
 
 **待完成功能：**
 - ⬜ Vercel 部署配置 (vercel.json, Edge Functions)
 - ⬜ 用户账户系统 + 云同步 (MVP 后期)
+
+---
+
+## 十一、待优化事项 (TODO)
+
+> 以下为后续迭代中需要优化和完善的功能点
+
+### 11.1 Step3 单标签润色优化 ⚠️ 高优先级
+
+**问题描述**：
+当前在 Step3 中使用 AI 润色单个标签时，AI 改动幅度过大，可能破坏用户原有意图。
+
+**优化方案**：
+- 修改 `polishTagContent()` 的 System Prompt，强调"最小改动原则"
+- 添加约束：仅修正语法错误、优化表述清晰度，保留用户核心内容
+- 考虑添加"改动程度"选项：轻微润色 / 中等优化 / 重写
+
+**涉及文件**：
+- `src/services/ai/generateService.ts` - `polishTagContent()` 函数
+
+---
+
+### 11.2 语言/风格选项位置调整 ⚠️ 高优先级
+
+**问题描述**：
+当前"语言"和"输出风格"选项在 Step3 页面，但这些配置应在 AI 生成内容之前就确定。
+
+**优化方案**：
+1. 将语言/风格选择器移至 Step2 页面（AI 分析结果展示后、点击"接受并生成"前）
+2. Step3 仅保留标签选择和内容编辑功能
+3. 更新 `generateTagContents()` 调用时机
+
+**涉及文件**：
+- `src/components/wizard/Step2Analysis.tsx` - 添加语言/风格选择器
+- `src/components/wizard/Step3Adjust.tsx` - 移除语言/风格选择器
+- `src/store/generateStore.ts` - 确保状态正确传递
+
+---
+
+### 11.3 Web 端提示词 AI 智能转换 ⚠️ 中优先级
+
+**问题描述**：
+当前 Web 端提示词是通过硬编码规则从 CLI 版本转换而来（`generateWebPrompt()`），导致：
+- 转换后内容可能过长
+- 格式不够灵活
+- 无法根据上下文智能调整
+
+**优化方案**：
+1. 新增 `convertCliToWeb()` AI 服务函数
+2. 使用 AI 进行智能压缩和格式转换
+3. 保留关键信息的同时优化篇幅
+4. 添加"转换风格"选项：精简版 / 标准版 / 完整版
+
+**涉及文件**：
+- `src/services/ai/generateService.ts` - 新增 AI 转换函数
+- `src/services/promptGenerator.ts` - 调用 AI 转换替代硬编码规则
+- `src/components/wizard/Step4Result.tsx` - 更新转换逻辑
+
+---
+
+### 11.4 项目结构与代码质量优化 📋 低优先级
+
+**优化内容**：
+
+#### 代码结构规范化
+- [ ] 统一错误处理机制（全局 Error Boundary + Toast 提示）
+- [ ] 抽取公共组件（LoadingOverlay, ErrorMessage 等）
+- [ ] 统一 API 响应格式和错误码定义
+
+#### 类型安全增强
+- [ ] 完善所有函数的 TypeScript 类型注解
+- [ ] 添加 Zod 运行时类型验证（AI 响应解析）
+- [ ] 移除 `any` 和 `unknown` 类型的滥用
+
+#### 可测试性改进
+- [ ] 添加单元测试（Vitest）
+- [ ] 添加组件测试（React Testing Library）
+- [ ] 添加 E2E 测试（Playwright）
+
+#### 性能优化
+- [ ] 实现组件懒加载（React.lazy + Suspense）
+- [ ] 优化大型列表渲染（虚拟滚动）
+- [ ] 添加请求缓存和防抖
+
+---
+
+### 11.5 项目部署 🚀 高优先级
+
+**部署目标**：Vercel 生产环境
+
+**待完成事项**：
+- [ ] 配置 `vercel.json` 部署文件
+- [ ] 设置环境变量（API Keys 加密存储）
+- [ ] 配置 Edge Functions（如需服务端 API 代理）
+- [ ] 配置自定义域名（可选）
+- [ ] 设置 CI/CD 自动部署（GitHub 集成）
+
+**部署检查清单**：
+```bash
+# 1. 构建验证
+npm run build
+npm run preview
+
+# 2. 部署到 Vercel
+vercel
+vercel --prod
+
+# 3. 环境变量配置
+# 在 Vercel Dashboard 设置：
+# - VITE_APP_VERSION
+# - (其他必要的环境变量)
+```
+
+---
+
+### 11.6 优化任务优先级总览
+
+| 优先级 | 任务 | 复杂度 | 预计工时 |
+|--------|------|--------|----------|
+| ⚠️ P0 | Step3 单标签润色优化 | 低 | 2h |
+| ⚠️ P0 | 语言/风格选项位置调整 | 中 | 4h |
+| ⚠️ P1 | Web 端 AI 智能转换 | 高 | 8h |
+| 🚀 P1 | 项目部署 | 中 | 4h |
+| 📋 P2 | 代码结构规范化 | 高 | 持续迭代 |
