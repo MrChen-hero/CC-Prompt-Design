@@ -7,8 +7,12 @@ import { Loader2, AlertCircle } from "lucide-react"
 import {
   analyzeUserDescription,
   generateTagContents as aiGenerateTagContents,
+  qualityCheckPrompt,
+  polishPromptByQualityCheck,
   canUseAI,
+  type QualityCheckResult,
 } from "@/services/ai"
+import { GenerationOverlay, type GenerationPhase } from "./GenerationOverlay"
 
 export function Step2Analysis() {
   const {
@@ -23,7 +27,12 @@ export function Step2Analysis() {
   const { userDescription, analysis, adjustments, error } = session
   const { language, outputStyle } = adjustments
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isGeneratingContent, setIsGeneratingContent] = useState(false)
+
+  // 多阶段生成状态
+  const [showOverlay, setShowOverlay] = useState(false)
+  const [generationPhase, setGenerationPhase] = useState<GenerationPhase>('designing')
+  const [qualityScore, setQualityScore] = useState<number | undefined>()
+  const [overlayError, setOverlayError] = useState<string | undefined>()
 
   // 自动开始分析
   useEffect(() => {
@@ -56,28 +65,90 @@ export function Step2Analysis() {
     startAnalysis()
   }, [userDescription, analysis, isAnalyzing, setAnalysis, setGenerating, setError])
 
-  // 接受并生成标签内容
+  // 接受并生成标签内容（三阶段流程）
   const handleAcceptAndGenerate = async () => {
     if (!analysis) return
 
-    setIsGeneratingContent(true)
+    // 重置状态
+    setShowOverlay(true)
+    setGenerationPhase('designing')
+    setQualityScore(undefined)
+    setOverlayError(undefined)
     setGenerating(true)
     setError(null)
 
     try {
+      // 阶段1: 生成提示词内容
+      setGenerationPhase('designing')
       const generatedContent = await aiGenerateTagContents(
         userDescription,
         analysis,
         language,
         outputStyle
       )
-      setGeneratedTagContent(generatedContent)
+
+      // 阶段2: 质量检查
+      setGenerationPhase('checking')
+      let qualityResult: QualityCheckResult
+      try {
+        qualityResult = await qualityCheckPrompt(
+          generatedContent,
+          analysis,
+          language,
+          outputStyle
+        )
+        setQualityScore(qualityResult.score)
+      } catch (checkError) {
+        // 质量检查失败时，使用默认通过结果继续流程
+        console.warn('Quality check failed, using default:', checkError)
+        qualityResult = {
+          passed: true,
+          score: 75,
+          issues: [],
+          summary: '质量检查服务暂时不可用，已跳过检查',
+        }
+        setQualityScore(qualityResult.score)
+      }
+
+      // 阶段3: 根据检查结果润色
+      setGenerationPhase('polishing')
+      let finalContent = generatedContent
+
+      // 只有评分低于90分才需要润色
+      if (qualityResult.score < 90) {
+        try {
+          finalContent = await polishPromptByQualityCheck(
+            generatedContent,
+            qualityResult,
+            analysis,
+            language,
+            outputStyle
+          )
+        } catch (polishError) {
+          // 润色失败时使用原内容
+          console.warn('Polish failed, using original:', polishError)
+        }
+      }
+
+      // 完成
+      setGenerationPhase('complete')
+      setGeneratedTagContent(finalContent)
+
+      // 短暂延迟后跳转，让用户看到完成状态
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setShowOverlay(false)
       nextStep()
     } catch (err) {
       console.error('Failed to generate content:', err)
+      setGenerationPhase('error')
+      setOverlayError(err instanceof Error ? err.message : '生成失败，请重试')
       setError(err instanceof Error ? err.message : '生成失败，请重试')
+
+      // 3秒后关闭蒙版
+      setTimeout(() => {
+        setShowOverlay(false)
+      }, 3000)
     } finally {
-      setIsGeneratingContent(false)
       setGenerating(false)
     }
   }
@@ -130,9 +201,14 @@ export function Step2Analysis() {
 
         <div className="space-y-3">
           {/* 角色定位 */}
-          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-800 rounded-lg">
-            <span className="text-slate-400 mr-2">📋 角色定位：</span>
-            <span className="text-white font-medium">{analysis.roleIdentification}</span>
+          <div className="p-3 bg-slate-800 rounded-lg">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="text-slate-400">📋 角色定位：</span>
+              <span className="text-white font-medium">{analysis.roleIdentification}</span>
+            </div>
+            {analysis.roleDescription && analysis.roleDescription !== analysis.roleIdentification && (
+              <p className="text-slate-400 text-sm pl-6">{analysis.roleDescription}</p>
+            )}
           </div>
 
           {/* 核心任务 */}
@@ -190,23 +266,16 @@ export function Step2Analysis() {
               setAnalysis(null)
               setError(null)
             }}
-            disabled={isGeneratingContent}
+            disabled={showOverlay}
           >
             重新分析
           </Button>
           <Button
             className="bg-purple-600 hover:bg-purple-700"
             onClick={handleAcceptAndGenerate}
-            disabled={isGeneratingContent}
+            disabled={showOverlay}
           >
-            {isGeneratingContent ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                生成中...
-              </>
-            ) : (
-              "接受并生成 →"
-            )}
+            接受并生成 →
           </Button>
         </div>
       </div>
@@ -218,6 +287,14 @@ export function Step2Analysis() {
           <span>{error}</span>
         </div>
       )}
+
+      {/* 多阶段生成蒙版 */}
+      <GenerationOverlay
+        isVisible={showOverlay}
+        currentPhase={generationPhase}
+        qualityScore={qualityScore}
+        errorMessage={overlayError}
+      />
     </div>
   )
 }

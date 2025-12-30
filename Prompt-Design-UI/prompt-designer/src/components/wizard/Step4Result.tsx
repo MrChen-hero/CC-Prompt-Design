@@ -32,6 +32,12 @@ export function Step4Result() {
     }
   }, [result, analysis, adjustments, userDescription, isGenerating, setResult, setGenerating])
 
+  // 返回调整时，清除 result 以确保重新生成
+  const handleBack = () => {
+    setResult(null)  // 清除 result，下次进入 Step4 时会重新生成
+    prevStep()
+  }
+
   const handleCopy = async () => {
     if (!result) return
     const text = activeTab === 'cli' ? result.cliVersion : result.webVersion
@@ -180,7 +186,7 @@ export function Step4Result() {
 
       {/* Actions */}
       <div className="flex justify-between pt-4 border-t border-slate-700">
-        <Button variant="outline" onClick={prevStep}>
+        <Button variant="outline" onClick={handleBack}>
           ← 返回调整
         </Button>
         <div className="flex gap-2">

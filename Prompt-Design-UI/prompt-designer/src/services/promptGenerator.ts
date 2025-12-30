@@ -11,7 +11,7 @@ export function generateCliPrompt(
   adjustments: GenerateSession['adjustments']
 ): string {
   const { enabledTags, language, outputStyle, customTagContent } = adjustments
-  const { roleIdentification, taskGoals } = analysis
+  const { roleIdentification, roleDescription, taskGoals } = analysis
 
   const sections: string[] = []
 
@@ -34,9 +34,14 @@ export function generateCliPrompt(
     return defaultContent
   }
 
+  // 构建角色能力描述
+  const roleAbilities = roleDescription && roleDescription !== roleIdentification
+    ? `，${roleDescription}`
+    : '，具备深厚的专业背景和丰富的实战经验'
+
   // <role>
   if (enabledTags.includes('role')) {
-    const defaultRole = `你是一位${roleIdentification}，具备深厚的专业背景和丰富的实战经验。
+    const defaultRole = `你是一位${roleIdentification}${roleAbilities}。
 你以${style.tone}的风格进行沟通，${style.manner}。`
     sections.push(`<role>\n${getTagContent('role', defaultRole)}\n</role>`)
   }
@@ -90,9 +95,9 @@ ${taskList}
   if (enabledTags.includes('constraints')) {
     const defaultConstraints = `- ${langConstraint}
 - 保持${style.tone}的沟通风格
-- 回答必须基于事实，如不确定请明确说明
-- 避免冗余内容，保持简洁有效
-- 遵循职业道德，不提供有害建议`
+- 回答必须基于事实，如不确定请明确说明"我不确定"或"需要进一步验证"
+- 保持内容简洁有效，聚焦核心信息
+- 遵循职业道德，仅提供对用户有益的建议`
     sections.push(`<constraints>\n${getTagContent('constraints', defaultConstraints)}\n</constraints>`)
   }
 

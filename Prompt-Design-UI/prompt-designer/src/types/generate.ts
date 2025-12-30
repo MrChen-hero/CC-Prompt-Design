@@ -8,7 +8,8 @@ export interface GenerateSession {
 
   // Step 2: AI 分析结果
   analysis: {
-    roleIdentification: string
+    roleIdentification: string      // 角色名称（简短）
+    roleDescription: string         // 角色能力描述（详细）
     taskGoals: string[]
     recommendedTemplates: string[]
     suggestedTags: XmlTag[]
