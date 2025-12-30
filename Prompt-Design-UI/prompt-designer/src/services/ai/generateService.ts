@@ -198,7 +198,20 @@ ${description}
       throw new Error('AI 响应格式错误')
     }
 
-    const result = JSON.parse(jsonMatch[0]) as Partial<Record<XmlTag, string>>
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>
+
+    // 验证并过滤：确保所有值都是字符串类型
+    const result: Partial<Record<XmlTag, string>> = {}
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'string') {
+        result[key as XmlTag] = value
+      } else if (value !== null && value !== undefined) {
+        // 如果不是字符串但有值，尝试转换为字符串
+        result[key as XmlTag] = String(value)
+      }
+      // null 或 undefined 的值直接跳过
+    }
+
     return result
   } catch (error) {
     if (error instanceof SyntaxError) {

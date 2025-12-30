@@ -26,8 +26,10 @@ export function generateCliPrompt(
 
   // 辅助函数：获取标签内容（优先使用自定义内容）
   const getTagContent = (tag: XmlTag, defaultContent: string): string => {
-    if (customTagContent[tag] !== undefined && customTagContent[tag].trim() !== '') {
-      return customTagContent[tag]
+    const custom = customTagContent[tag]
+    // 类型检查：确保 custom 是字符串且非空
+    if (custom !== undefined && custom !== null && typeof custom === 'string' && custom.trim() !== '') {
+      return custom
     }
     return defaultContent
   }

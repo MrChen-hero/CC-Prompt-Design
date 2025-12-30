@@ -139,6 +139,11 @@ export async function decryptApiKey(encryptedKey: string): Promise<string> {
 
 /**
  * 验证 API Key 格式
+ * 基于各供应商官方文档的格式规范
+ *
+ * @see https://docs.anthropic.com/ - Anthropic: sk-ant- 前缀
+ * @see https://platform.openai.com/docs/api-reference/authentication - OpenAI: sk- 前缀
+ * @see https://ai.google.dev/gemini-api/docs/api-key - Google: AIzaSy 前缀
  */
 export function validateApiKey(
   provider: string,
@@ -148,25 +153,55 @@ export function validateApiKey(
     return { valid: false, message: 'API Key 不能为空' }
   }
 
+  const trimmedKey = apiKey.trim()
+
   switch (provider) {
     case 'anthropic':
-      if (!apiKey.startsWith('sk-ant-')) {
-        return { valid: false, message: 'Anthropic API Key 应以 sk-ant- 开头' }
+      // Anthropic API Key 格式: sk-ant-api03-... 或 sk-ant-...
+      if (!trimmedKey.startsWith('sk-ant-')) {
+        return {
+          valid: false,
+          message: 'Anthropic API Key 应以 sk-ant- 开头（例如: sk-ant-api03-...）',
+        }
+      }
+      if (trimmedKey.length < 40) {
+        return { valid: false, message: 'Anthropic API Key 长度不足' }
       }
       break
+
     case 'openai':
-      if (!apiKey.startsWith('sk-')) {
-        return { valid: false, message: 'OpenAI API Key 应以 sk- 开头' }
+      // OpenAI API Key 格式:
+      // - 项目密钥: sk-proj-...
+      // - 管理员密钥: sk-admin-...
+      // - 传统密钥: sk-...
+      if (!trimmedKey.startsWith('sk-')) {
+        return {
+          valid: false,
+          message: 'OpenAI API Key 应以 sk- 开头（例如: sk-proj-... 或 sk-...）',
+        }
+      }
+      if (trimmedKey.length < 20) {
+        return { valid: false, message: 'OpenAI API Key 长度不足' }
       }
       break
+
     case 'google':
-      if (apiKey.length < 20) {
-        return { valid: false, message: 'Google API Key 格式不正确' }
+      // Google Gemini API Key 格式: AIzaSy...
+      if (!trimmedKey.startsWith('AIzaSy')) {
+        return {
+          valid: false,
+          message: 'Google API Key 应以 AIzaSy 开头',
+        }
+      }
+      if (trimmedKey.length < 30) {
+        return { valid: false, message: 'Google API Key 长度不足' }
       }
       break
-    case 'deepseek':
-      if (!apiKey.startsWith('sk-')) {
-        return { valid: false, message: 'DeepSeek API Key 应以 sk- 开头' }
+
+    case 'custom':
+      // 自定义 OpenAI 兼容接口：只检查非空
+      if (trimmedKey.length < 10) {
+        return { valid: false, message: 'API Key 长度不足（至少 10 个字符）' }
       }
       break
   }

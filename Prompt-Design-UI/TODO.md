@@ -62,13 +62,12 @@ const { messages, input, handleSubmit } = useChat({
 
 #### 2.1.1 支持的模型
 
-| 模型提供商 | 模型 | API 端点 |
-|------------|------|----------|
-| **Anthropic** | Claude 3.5 Sonnet, Claude 3 Opus | `api.anthropic.com` |
-| **OpenAI** | GPT-4o, GPT-4 Turbo | `api.openai.com` |
-| **Google** | Gemini 1.5 Pro, Gemini 2.0 Flash | `generativelanguage.googleapis.com` |
-| **DeepSeek** | DeepSeek-V3, DeepSeek-R1 | `api.deepseek.com` |
-| **自定义** | OpenAI 兼容 API | 用户自定义端点 |
+| 模型提供商 | 模型 | API 端点 | 状态 |
+|------------|------|----------|------|
+| **Anthropic** | Claude 4, Claude 3.5 Sonnet | `api.anthropic.com` | ✅ 已实现 |
+| **OpenAI** | GPT-4o, GPT-4, o1 系列 | `api.openai.com` | ✅ 已实现 |
+| **Google** | Gemini 2.5, Gemini 2.0, Gemini 1.5 | `generativelanguage.googleapis.com` | ✅ 已实现 |
+| **自定义** | OpenAI 兼容 API (Ollama, LM Studio, vLLM 等) | 用户自定义端点 | ✅ 已实现 |
 
 #### 2.1.2 API 配置界面
 
@@ -96,9 +95,9 @@ const { messages, input, handleSubmit } = useChat({
 ```typescript
 interface ModelConfig {
   id: string;
-  provider: 'anthropic' | 'openai' | 'google' | 'deepseek' | 'custom';
+  provider: 'anthropic' | 'openai' | 'google' | 'custom';
   apiKey: string;          // 加密存储
-  modelId: string;         // e.g., "claude-3-5-sonnet-20241022"
+  modelId: string;         // e.g., "claude-sonnet-4-20250514"
   baseUrl?: string;        // 自定义端点
   temperature: number;     // 0-1
   maxTokens: number;
@@ -1287,8 +1286,8 @@ vercel domains add prompt-designer.yourdomain.com
 |------|------|----------|------|
 | **M0** | 项目初始化 | `npm run dev` 可运行 | ✅ 已完成 |
 | **M1** | 基础架构 | 侧边栏导航、深色主题 | ✅ 已完成 |
-| **M2** | 模型配置 | API Key 保存、连接测试 | ⬜ 待完成 |
-| **M3** | 生成向导 | 4 步流程完整、流式输出 | ✅ 已完成 (模拟) |
+| **M2** | 模型配置 | API Key 保存、连接测试 | ✅ 已完成 |
+| **M3** | 生成向导 | 4 步流程完整、流式输出 | ✅ 已完成 |
 | **M4** | 仓库功能 | CRUD、搜索、分类 | ✅ 已完成 |
 | **M5** | 格式转换 | CLI ↔ Web 互转 | ✅ 已完成 |
 | **M6** | 部署上线 | Vercel 生产环境可访问 | ⬜ 待完成 |
@@ -1354,16 +1353,23 @@ prompt-designer/
 │   │   ├── usePrompts.ts
 │   │   └── useGenerate.ts
 │   ├── services/                # API 服务
-│   │   ├── api/
-│   │   │   ├── anthropic.ts
-│   │   │   ├── openai.ts
-│   │   │   └── index.ts
-│   │   ├── convert.ts           # 格式转换服务
-│   │   └── storage.ts           # 本地存储服务
+│   │   ├── ai/                  # AI 服务层 (已实现)
+│   │   │   ├── index.ts         # 统一入口，createAIProvider
+│   │   │   ├── types.ts         # 类型定义
+│   │   │   ├── anthropic.ts     # Anthropic Claude 提供者
+│   │   │   ├── openai.ts        # OpenAI GPT 提供者
+│   │   │   ├── google.ts        # Google Gemini 提供者
+│   │   │   ├── configService.ts # 配置服务
+│   │   │   └── generateService.ts # 生成服务
+│   │   ├── crypto.ts            # API Key 加密/解密服务 (已实现)
+│   │   ├── promptGenerator.ts   # 提示词生成器
+│   │   ├── db.ts                # Dexie 本地数据库
+│   │   └── convert.ts           # 格式转换服务
 │   ├── store/                   # 状态管理
 │   │   ├── modelStore.ts
 │   │   ├── promptStore.ts
-│   │   └── settingsStore.ts
+│   │   ├── generateStore.ts
+│   │   └── index.ts
 │   ├── types/                   # TypeScript 类型
 │   │   ├── model.ts
 │   │   ├── prompt.ts
@@ -1440,24 +1446,25 @@ npm install clsx tailwind-merge lucide-react prism-react-renderer
 
 ### 开发优先级
 
-| 优先级 | 任务 | 预计产出 |
-|--------|------|----------|
-| **P0** | 项目初始化 + 基础架构 | 可运行的空项目框架 |
-| **P0** | 模型配置组件 | API Key 保存、连接测试 |
-| **P0** | 4 步生成向导 | 完整生成流程（流式） |
-| **P0** | 提示词仓库 | CRUD + 本地存储 |
-| **P1** | CLI ↔ Web 转换 | 格式互转功能 |
-| **P1** | 导入/导出 | JSON/Markdown 导出 |
-| **P2** | 更多模型支持 | OpenAI、Gemini、DeepSeek |
-| **P3** | 用户账户 + 云同步 | 多设备同步 |
+| 优先级 | 任务 | 预计产出 | 状态 |
+|--------|------|----------|------|
+| **P0** | 项目初始化 + 基础架构 | 可运行的空项目框架 | ✅ 已完成 |
+| **P0** | 模型配置组件 | API Key 保存、连接测试 | ✅ 已完成 |
+| **P0** | 4 步生成向导 | 完整生成流程（流式） | ✅ 已完成 |
+| **P0** | 提示词仓库 | CRUD + 本地存储 | ✅ 已完成 |
+| **P1** | CLI ↔ Web 转换 | 格式互转功能 | ✅ 已完成 |
+| **P1** | 导入/导出 | JSON/Markdown 导出 | ✅ 已完成 |
+| **P2** | 多模型支持 | Anthropic, OpenAI, Google, 自定义 | ✅ 已完成 |
+| **P2** | Vercel 部署 | 生产环境可访问 | ⬜ 待完成 |
+| **P3** | 用户账户 + 云同步 | 多设备同步 | ⬜ 待完成 |
 
 ### 里程碑检查点
 
 ```
 M0 完成标志：npm run dev 可正常启动          ✅ 已完成
 M1 完成标志：侧边栏导航 + 深色主题生效        ✅ 已完成
-M2 完成标志：可保存 API Key 并测试连接        ⬜ 待完成
-M3 完成标志：可完成 4 步向导生成提示词        ✅ 已完成 (模拟AI)
+M2 完成标志：可保存 API Key 并测试连接        ✅ 已完成
+M3 完成标志：可完成 4 步向导生成提示词        ✅ 已完成
 M4 完成标志：提示词可保存/编辑/删除          ✅ 已完成
 M5 完成标志：CLI ↔ Web 格式可互转            ✅ 已完成
 M6 完成标志：vercel --prod 部署成功          ⬜ 待完成
@@ -1480,9 +1487,13 @@ M6 完成标志：vercel --prod 部署成功          ⬜ 待完成
 - ✅ 提示词设计规则常量 (CLAUDE.md + Webrule.md 规则已存入 promptRules.ts)
 - ✅ Step3 XML 标签展开编辑功能 (所有标签均可自定义内容)
 - ✅ 提示词仓库详情查看与编辑功能 (Dialog 弹窗式详情页)
+- ✅ **真实 AI API 集成** (支持 Anthropic Claude, OpenAI GPT, Google Gemini)
+- ✅ **API Key 加密存储** (AES-GCM 加密，使用 Web Crypto API)
+- ✅ **API Key 格式验证** (基于各供应商官方文档规范)
+- ✅ **自定义 OpenAI 兼容接口支持** (支持 Ollama, LM Studio, vLLM 等)
+- ✅ **Settings 页面完整重写** (支持所有提供商配置，连接测试，自定义模型)
+- ✅ **Vite 代理配置** (解决开发环境 CORS 跨域问题)
 
 **待完成功能：**
-- ⬜ 真实 AI API 集成 (当前为模拟分析)
-- ⬜ API Key 加密存储与验证
-- ⬜ Vercel 部署配置
-- ⬜ 更多模型支持 (OpenAI, Gemini, DeepSeek)
+- ⬜ Vercel 部署配置 (vercel.json, Edge Functions)
+- ⬜ 用户账户系统 + 云同步 (MVP 后期)

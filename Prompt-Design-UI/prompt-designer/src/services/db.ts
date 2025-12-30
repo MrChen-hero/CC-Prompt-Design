@@ -104,7 +104,9 @@ export const promptsDB = {
   },
 
   async getFavorites(): Promise<DBPrompt[]> {
-    return db.prompts.where('isFavorite').equals(1).toArray()
+    // IndexedDB 不支持布尔值作为索引键，改用 filter 方法
+    const all = await db.prompts.toArray()
+    return all.filter(p => p.isFavorite === true)
   },
 
   async incrementUsage(id: number): Promise<void> {
@@ -124,7 +126,9 @@ export const modelsDB = {
   },
 
   async getDefault(): Promise<DBModelConfig | undefined> {
-    return db.models.where('isDefault').equals(1).first()
+    // IndexedDB 不支持布尔值作为索引键，改用 filter 方法
+    const all = await db.models.toArray()
+    return all.find(m => m.isDefault === true)
   },
 
   async create(model: Omit<DBModelConfig, 'id'>): Promise<number> {

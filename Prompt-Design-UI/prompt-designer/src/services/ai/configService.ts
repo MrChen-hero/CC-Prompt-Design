@@ -65,7 +65,7 @@ export async function getConfiguredAIProvider(): Promise<AIProvider | null> {
 
   try {
     const provider = createAIProvider({
-      provider: config.provider as 'anthropic' | 'openai' | 'google' | 'deepseek' | 'custom',
+      provider: config.provider as 'anthropic' | 'openai' | 'google' | 'custom',
       apiKey: config.apiKey,
       baseUrl: config.baseUrl,
     })
