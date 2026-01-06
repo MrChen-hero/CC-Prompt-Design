@@ -82,181 +82,67 @@
 
 ## 内置工具调用规则
 
-### 文件操作类
+这些工具直接与本地文件系统和系统环境交互。调用时需确保参数准确，特别是涉及文件修改的操作。
 
-#### Read (读取文件)
-读取本地文件内容，支持代码、图片、PDF、Jupyter Notebook。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "file_path": "/absolute/path/to/file.ts",
-      "limit": 200,
-      "offset": 0
-    }
-    ```
+### 1. 文件系统操作 (File System)
+
+#### list_directory (列出目录)
+列出指定路径下的文件和子文件夹。
 *   **参数说明**:
-    *   `file_path`: (必填) 文件的绝对路径。
-    *   `limit`: (可选) 读取的行数限制，大文件时使用。
-    *   `offset`: (可选) 起始行偏移量。
+    *   `dir_path`: (必填) 目标目录路径，`.` 代表当前目录。
+    *   `ignore_patterns`: (可选) 要忽略的文件名模式列表。
 
-#### Write (写入文件)
-创建或覆盖文件。使用前必须先 Read 该文件（如已存在）。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "file_path": "/absolute/path/to/file.ts",
-      "content": "文件完整内容..."
-    }
-    ```
+#### read_file (读取文件)
+读取文件的全部或部分内容。
 *   **参数说明**:
-    *   `file_path`: (必填) 文件的绝对路径。
-    *   `content`: (必填) 要写入的完整内容。
-*   **⚠️ 常见错误**:
-    *   ❌ `{ "file_contents": "..." }` → 参数名错误
-    *   ✅ `{ "content": "..." }` → 正确参数名
+    *   `file_path`: (必填) 文件路径。
+    *   `start_line`: (可选) 起始行号（包含）。
+    *   `end_line`: (可选) 结束行号（包含）。
 
-#### Edit (编辑文件)
-通过字符串替换编辑文件。使用前必须先 Read 该文件。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "file_path": "/absolute/path/to/file.ts",
-      "old_string": "要替换的原文本",
-      "new_string": "替换后的新文本",
-      "replace_all": false
-    }
-    ```
+#### write_file (写入文件)
+创建新文件或**完全覆盖**现有文件。
 *   **参数说明**:
-    *   `file_path`: (必填) 文件的绝对路径。
-    *   `old_string`: (必填) 要替换的原始文本（必须唯一）。
-    *   `new_string`: (必填) 替换后的新文本。
-    *   `replace_all`: (可选) 是否替换所有匹配项，默认 false。
+    *   `file_path`: (必填) 文件保存路径。
+    *   `content`: (必填) 写入的完整文本内容。
 
-### 搜索类
-
-#### Glob (文件模式匹配)
-按 glob 模式搜索文件路径。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "pattern": "**/*.ts",
-      "path": "/search/directory"
-    }
-    ```
+#### replace (替换文本)
+在文件中替换指定的文本片段。**注意：** `old_string` 必须与文件内容**逐字精确匹配**（包括空格、缩进）。
 *   **参数说明**:
-    *   `pattern`: (必填) glob 匹配模式，如 `**/*.ts`、`src/**/*.tsx`。
-    *   `path`: (可选) 搜索目录，默认当前工作目录。
+    *   `file_path`: (必填) 目标文件路径。
+    *   `old_string`: (必填) 要被替换的原始内容（需提供足够上下文以确保唯一性）。
+    *   `new_string`: (必填) 替换后的内容。
+    *   `instruction`: (必填) 修改意图的自然语言描述。
+    *   `expected_replacements`: (可选) 预期替换的次数，用于安全检查。
 
-#### Grep (内容搜索)
-使用正则表达式搜索文件内容。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "pattern": "function\\s+\\w+",
-      "path": "/search/directory",
-      "glob": "*.ts",
-      "output_mode": "files_with_matches",
-      "head_limit": 10
-    }
-    ```
+#### glob (查找文件)
+使用 glob 模式查找文件路径。
+*   **参数说明**:
+    *   `pattern`: (必填) 文件匹配模式（如 `src/**/*.js）。
+
+#### search_file_content (搜索内容)
+在文件中搜索正则表达式匹配项 (基于 ripgrep)。
 *   **参数说明**:
     *   `pattern`: (必填) 正则表达式搜索模式。
-    *   `path`: (可选) 搜索路径，默认当前工作目录。
-    *   `glob`: (可选) 文件过滤模式。
-    *   `output_mode`: (可选) 输出模式：`files_with_matches`(默认) | `content` | `count`。
-    *   `head_limit`: (可选) 限制结果数量。
-*   **⚠️ 常见错误**:
-    *   ❌ `{ "paths": "src" }` → 参数名不存在
-    *   ✅ `{ "path": "src", "glob": "*.ts" }` → 使用 path + glob 组合
+    *   `dir_path`: (可选) 搜索的根目录。
 
-### 执行类
+### 2. 系统与记忆 (System & Memory)
 
-#### Bash (执行命令)
-在 shell 中执行命令。用于 git、npm、docker 等操作。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "command": "git status",
-      "description": "Show working tree status",
-      "timeout": 120000
-    }
-    ```
+#### run_shell_command (运行命令)
+在当前系统 shell (Windows 下为 PowerShell) 中执行命令。
 *   **参数说明**:
-    *   `command`: (必填) 要执行的命令。
-    *   `description`: (可选) 命令的简短描述（5-10 词）。
-    *   `timeout`: (可选) 超时时间（毫秒），最大 600000，默认 120000。
+    *   `command`: (必填) 要执行的命令行字符串。
 
-#### Task (启动子代理)
-启动专门的子代理处理复杂任务。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "prompt": "搜索项目中所有处理用户认证的文件并分析其实现方式",
-      "description": "分析用户认证实现",
-      "subagent_type": "Explore"
-    }
-    ```
+#### save_memory (保存记忆)
+保存关于用户的偏好或事实到长期记忆中。
 *   **参数说明**:
-    *   `prompt`: (必填) 任务详细描述。
-    *   `description`: (必填) 任务简短描述（3-5 词）。
-    *   `subagent_type`: (必填) 代理类型：`general-purpose` | `Explore` | `Plan`。
-*   **⚠️ 常见错误**:
-    *   ❌ `{ "prompt": "..." }` → 缺少 description
-    *   ❌ `{ "description": "..." }` → 缺少 prompt
-    *   ✅ 必须同时提供 `prompt` + `description` + `subagent_type`
+    *   `fact`: (必填) 需要记住的具体事实陈述。
 
-### 任务管理类
-
-#### TodoWrite (任务列表)
-管理和追踪任务进度。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "todos": [
-        {
-          "content": "实现用户登录功能",
-          "status": "in_progress",
-          "activeForm": "实现用户登录功能中"
-        }
-      ]
-    }
-    ```
+#### fetch (获取 URL)
+从互联网获取 URL 内容，并可选择将其提取为 Markdown 格式。
 *   **参数说明**:
-    *   `todos`: (必填) 任务数组，每项包含：
-        *   `content`: (必填) 任务描述（祈使句）。
-        *   `status`: (必填) 状态：`pending` | `in_progress` | `completed`。
-        *   `activeForm`: (必填) 进行时描述。
-*   **⚠️ 常见错误**:
-    *   ❌ `{ "todos": "[{...}]" }` → todos 是字符串（错误）
-    *   ✅ `{ "todos": [{...}] }` → todos 必须是数组对象（正确）
+    *   `url`: (必填) 完整的 URL 地址。
+    *   `extract_markdown`: (可选) 布尔值。如果为 true，尝试将页面内容转换为 Markdown。默认为 false。
 
-### 网络类
-
-#### WebSearch (网络搜索)
-执行网络搜索获取最新信息。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "query": "React 19 new features 2025"
-    }
-    ```
-*   **参数说明**:
-    *   `query`: (必填) 搜索查询词。
-
-#### WebFetch (获取网页)
-获取指定 URL 内容并用 AI 处理。
-*   **JSON 调用示例**:
-    ```json
-    {
-      "url": "https://example.com/docs",
-      "prompt": "提取页面的主要 API 文档内容"
-    }
-    ```
-*   **参数说明**:
-    *   `url`: (必填) 目标 URL。
-    *   `prompt`: (必填) 对页面内容的处理指令。
-
----
 
 ## MCP 服务调用规则
 
@@ -308,9 +194,6 @@
     *   `branchFromThought`: (可选) 分支思考的起点步骤。
     *   `branchId`: (可选) 分支标识符。
     *   `needsMoreThoughts`: (可选) 达到预估步数但仍需继续时设为 true。
-*   **⚠️ 常见错误**:
-    *   ❌ 遗漏 `nextThoughtNeeded` → 报错 "expected boolean, received undefined"
-    *   ✅ 4 个必填参数缺一不可：`thought` + `thoughtNumber` + `totalThoughts` + `nextThoughtNeeded`
 
 ### mcp__context7__resolve-library-id (解析库 ID)
 将库名解析为 Context7 兼容的库 ID。查询文档前必须先调用。
@@ -324,10 +207,6 @@
 *   **参数说明**:
     *   `libraryName`: (必填) 库/框架名称。
     *   `query`: (必填) 用户的原始问题。
-*   **⚠️ 常见错误**:
-    *   ❌ `{ "query": "pandas" }` → 缺少 libraryName
-    *   ❌ `{ "libraryName": "pandas" }` → 缺少 query
-    *   ✅ 必须同时提供 `libraryName` + `query`
 
 ### mcp__context7__query-docs (查询库文档)
 获取指定库的最新文档和代码示例。
