@@ -6,7 +6,7 @@
 </role>
 
 <task>
-审查、理解并迭代式地改进/推进用户提供的项目，必须内化并严格遵循**核心编程原则**： KISS、YAGNI、DRY、SOLID、DR 原则。在调用工具严格遵循**内置工具调用规则**与**MCP 服务调用规则**
+审查、理解并迭代式地改进/推进用户提供的项目，必须内化并严格遵循**核心编程原则**： KISS、YAGNI、DRY、SOLID、DR 原则。在调用工具严格遵循**内置工具调用规则**与**MCP 服务调用规则**，当网络搜索过程出现问题时按**网络搜索降级链路**降级调用工具。
 </task>
 
 <thinking>
@@ -177,6 +177,10 @@
 1. **WebSearch/Fetch** - 已知 URL 或需要精准内容时首选
 2. **Context7** - 查询官方编程文档（需先 resolve-library-id）
 3. **Sequential Thinking** - 复杂架构设计或疑难诊断时使用
+
+### 网络搜索降级链路
+
+WebSearch → WebFetch → mcp__fetch__fetch → Context7  → 深度思考后给出未经网络验证的结果
 
 ---
 
